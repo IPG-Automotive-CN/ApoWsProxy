@@ -1,0 +1,333 @@
+<!-- typedef enum {
+    ApoDouble,			/* 64 bits */
+    ApoFloat,			/* 32 bits */
+    ApoLong,  ApoULong,		/* 32/64 bits depending on local arch */
+    ApoShort, ApoUShort,	/* 16 bits */
+    ApoChar,  ApoUChar,		/*  8 bits */
+    ApoInt,   ApoUInt,		/* 32 bits */
+    ApoLLong, ApoULLong,	/* 64 bits */
+
+    ApoVoidType = 65535
+} tApoQuantType;
+
+static int getDataSize(tApoQuantType type)
+{
+    int size = 0;
+    switch (type) {
+        case ApoDouble: 
+        case ApoLLong:  
+        case ApoULLong: size = 8; break;
+        case ApoFloat:
+        case ApoInt:    
+        case ApoUInt:   size = 4; break;
+        case ApoShort:  
+        case ApoUShort: size = 2; break;
+        case ApoChar:    
+        case ApoUChar:  size = 1; break;
+        //TODO
+        // case ApoLong:break;
+        // case ApoULong:break;
+        default:        size = 0; break;
+    }
+    return size;
+}
+
+typedef struct 
+{
+    uint32_t name_len;
+    char *name;
+    tApoQuantType type;
+}quantData;
+
+
+typedef struct 
+{
+    uint32_t name_len;
+    char *name;
+    tApoQuantType type;
+    void *data;
+}subQuantData; -->
+
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <script>
+        window.onload = function() {
+            var ws = new WebSocket('ws://localhost:8766');
+
+            var recvingQuants = true;
+
+
+            ws.binaryType = 'arraybuffer'; // We want to receive binary data
+
+            let fileData = [];
+            let receivingFile = false;
+
+            // Enum for tApoQuantType
+            const tApoQuantType = {
+                ApoDouble: 0,
+                ApoFloat: 1,
+                ApoLong: 2,
+                ApoULong: 3,
+                ApoShort: 4,
+                ApoUShort: 5,
+                ApoChar: 6,
+                ApoUChar: 7,
+                ApoInt: 8,
+                ApoUInt: 9,
+                ApoLLong: 10,
+                ApoULLong: 11,
+                ApoVoidType: 65535
+            };
+
+            // Function to get data size based on tApoQuantType
+            function getDataSize(type) {
+                switch (type) {
+                    case tApoQuantType.ApoDouble:
+                    case tApoQuantType.ApoLLong:
+                    case tApoQuantType.ApoULLong:
+                        return 8;
+                    case tApoQuantType.ApoFloat:
+                    case tApoQuantType.ApoInt:
+                    case tApoQuantType.ApoUInt:
+                        return 4;
+                    case tApoQuantType.ApoShort:
+                    case tApoQuantType.ApoUShort:
+                        return 2;
+                    case tApoQuantType.ApoChar:
+                    case tApoQuantType.ApoUChar:
+                        return 1;
+                    default:
+                        return 0;
+                }
+            }
+
+            function getDataTypeStr(type)
+            {
+                switch (type) {
+                    case tApoQuantType.ApoDouble: return "double";
+                    case tApoQuantType.ApoLLong:  return "long long"
+                    case tApoQuantType.ApoULLong: return "unsigned long long";
+                    case tApoQuantType.ApoFloat:  return "float";
+                    case tApoQuantType.ApoInt:    return "int"; 
+                    case tApoQuantType.ApoUInt:   return "unsigned int";
+                    case tApoQuantType.ApoShort:  return "ushort";
+                    case tApoQuantType.ApoUShort: return "unsigned short";
+                    case tApoQuantType.ApoChar:   return "char";
+                    case tApoQuantType.ApoUChar:  return "unsigned char";
+                        return 1;
+                    default:
+                        return 0;
+                }
+            }
+
+            let quantDataArray = [];
+            function parseQuants(data)
+            {
+                let dataView = new DataView(data);
+                let offset = 0;
+
+                while (offset < dataView.byteLength) {
+                    // 解析 name_len
+                    let name_len = dataView.getUint32(offset, true);
+                    offset += 4;
+
+                    // 解析 name
+                    let nameBytes = new Uint8Array(data, offset, name_len);
+                    let name = new TextDecoder().decode(nameBytes);
+                    offset += name_len;
+
+                    // 解析 type
+                    let type = dataView.getUint32(offset, true);
+                    offset += 4;
+
+                    // 将解析出的数据添加到数组中
+                    quantDataArray.push({ name_len, name, type });
+
+                    //console.log("i : "+ quantDataArray.length + " name : "+ name, " type : "+ getDataTypeStr(type));
+
+                }
+
+                // 处理解析后的 quantDataArray
+                //TODO
+            }
+
+
+            ws.onmessage = function(event) {
+
+                // console.log("receive data size = %d bytes", event.data.byteLength);
+                
+                if (typeof event.data === 'string') {
+                    console.log(event.data);
+                    if (event.data === 'begin send quants')
+                    {
+                        receivingFile = true;
+                    }else if(event.data === 'end send quants')
+                    {
+                        receivingFile = false;
+                    }
+                }else if(!receivingFile){
+                    let dataView = new DataView(event.data);
+                    let offset = 0;
+
+                    while (offset < dataView.byteLength) {
+                        // Read name_len
+                        let name_len = dataView.getUint32(offset, true);
+                        offset += 4;
+
+                        // Read name
+                        let name = '';
+                        for (let i = 0; i < name_len; i++) {
+                            name += String.fromCharCode(dataView.getUint8(offset));
+                            offset += 1;
+                        }
+
+                        // Read type
+                        let type = dataView.getUint32(offset, true);
+                        offset += 4;
+
+                        // Read data based on type
+                        let data;
+                        switch (type) {
+                            case tApoQuantType.ApoDouble:
+                                data = dataView.getFloat64(offset, true);
+                                offset += 8;
+                                break;
+                            case tApoQuantType.ApoFloat:
+                                data = dataView.getFloat32(offset, true);
+                                offset += 4;
+                                break;
+                            case tApoQuantType.ApoLong:
+                            case tApoQuantType.ApoInt:
+                                data = dataView.getInt32(offset, true);
+                                offset += 4;
+                                break;
+                            case tApoQuantType.ApoULong:
+                            case tApoQuantType.ApoUInt:
+                                data = dataView.getUint32(offset, true);
+                                offset += 4;
+                                break;
+                            case tApoQuantType.ApoShort:
+                                data = dataView.getInt16(offset, true);
+                                offset += 2;
+                                break;
+                            case tApoQuantType.ApoUShort:
+                                data = dataView.getUint16(offset, true);
+                                offset += 2;
+                                break;
+                            case tApoQuantType.ApoChar:
+                                data = dataView.getInt8(offset);
+                                offset += 1;
+                                break;
+                            case tApoQuantType.ApoUChar:
+                                data = dataView.getUint8(offset);
+                                offset += 1;
+                                break;
+                            case tApoQuantType.ApoLLong:
+                                data = dataView.getBigInt64(offset, true);
+                                offset += 8;
+                                break;
+                            case tApoQuantType.ApoULLong:
+                                data = dataView.getBigUint64(offset, true);
+                                offset += 8;
+                                break;
+                            default:
+                                data = null;
+                        }
+
+                        // Create quantData object
+                        let quantData = {
+                            name_len: name_len,
+                            name: name,
+                            type: type,
+                            data: data
+                        };
+                        // console.log(quantData);
+                         // Display quantData on the webpage
+                        let quantDataContainer = document.getElementById('quantDataContainer');
+                        let existingElement = document.getElementById(quantData.name);
+
+                        if (existingElement) {
+                            // Update existing element
+                            existingElement.innerHTML = `Name: ${quantData.name}, Type: ${quantData.type}, Data: ${quantData.data}`;
+                        } else {
+                            // Create new element
+                            let quantDataElement = document.createElement('div');
+                            quantDataElement.id = quantData.name;
+                            quantDataElement.innerHTML = `Name: ${quantData.name}, Type: ${quantData.type}, Data: ${quantData.data}`;
+                            quantDataContainer.appendChild(quantDataElement);
+                        }
+
+                        // Remove elements not in the current update
+                        let currentNames = new Set();
+                        for (let i = 0; i < quantDataContainer.children.length; i++) {
+                            currentNames.add(quantDataContainer.children[i].id);
+                        }
+                        if (!currentNames.has(quantData.name)) {
+                            let elementToRemove = document.getElementById(quantData.name);
+                            if (elementToRemove) {
+                                quantDataContainer.removeChild(elementToRemove);
+                            }
+                        }
+
+
+                    }
+
+                }else if(receivingFile)
+                {
+                    parseQuants(event.data);
+                }
+                
+
+            };
+
+            ws.onopen = function() {
+                console.log('Connected to the WebSocket server');
+                ws.send('GetAllQuantInfos');
+            };
+            ws.onerror = function(error) {
+                console.log('WebSocket error: ', error);
+            };
+
+            ws.onclose = function() {
+                console.log('WebSocket connection closed');
+            };
+
+            document.getElementById('sendButton').onclick = function() {
+                var inputText = document.getElementById('inputBox').value;
+                var msg = "Add Quants Subscribe : "+inputText;
+                sendMessage(msg);
+            };
+
+            function sendMessage(message) {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(message);
+                    console.log('Sent message: ' + message);
+                } else {
+                    console.log('WebSocket is not open');
+                }
+            }
+
+            document.getElementById('removeButton').onclick = function() {
+                var removeText = document.getElementById('removeBox').value;
+                var msg = "Remove Quants Subscribe : "+removeText;
+                sendMessage(msg);
+            };
+
+        };
+    </script>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <p>Open your browser's console to see the output.</p>
+    <input type="text" id="inputBox" placeholder="Enter Quant Name">
+    <button id="sendButton">Subscribe</button>
+    <input type="text" id="removeBox" placeholder="Enter Quant Name">
+    <button id="removeButton">Remove</button>
+    <div id="quantDataContainer"></div> <!-- Add this div to display quantData -->
+</body>
+</html>
